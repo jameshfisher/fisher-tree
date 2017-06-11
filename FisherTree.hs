@@ -53,6 +53,10 @@ fisherFind :: String -> Maybe (FisherNode v) ->  Maybe v
 fisherFind _ Nothing  = Nothing
 fisherFind s (Just f) = fisherFindNonEmpty s f
 
+fisherSingleton :: String -> v -> FisherNode v
+fisherSingleton "" v = FisherZero v
+fisherSingleton s v = FisherSucc (length s) s (Left v)
+
 assertions :: Bool
 assertions = all id [
   isValidNonEmptyFisherNodeAtHeight 0 (FisherZero "bar"),
