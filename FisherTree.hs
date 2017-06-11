@@ -2,6 +2,7 @@ module FisherTrie where
 
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.List (stripPrefix)
 
 type Height = Int  -- not required at runtime but useful for assertions
 
@@ -38,6 +39,20 @@ isValidFisherNodeAtHeight :: Height -> Maybe (FisherNode v) -> Bool
 isValidFisherNodeAtHeight h Nothing = True
 isValidFisherNodeAtHeight h (Just f) = isValidNonEmptyFisherNodeAtHeight h f
 
+fisherFindNonEmpty :: String -> FisherNode v -> Maybe v
+fisherFindNonEmpty "" (FisherZero v) = Just v
+fisherFindNonEmpty s  (FisherSucc h s'     (Left v)) = if s == s' then Just v else Nothing
+fisherFindNonEmpty s  (FisherSucc h prefix (Right m)) =
+  case stripPrefix prefix s of
+    Nothing -> Nothing
+    Just (c:rest) ->  case M.lookup c m of
+                        Nothing -> Nothing
+                        Just f  -> fisherFindNonEmpty rest f
+
+fisherFind :: String -> Maybe (FisherNode v) ->  Maybe v
+fisherFind _ Nothing  = Nothing
+fisherFind s (Just f) = fisherFindNonEmpty s f
+
 assertions :: Bool
 assertions = all id [
   isValidNonEmptyFisherNodeAtHeight 0 (FisherZero "bar"),
@@ -45,5 +60,9 @@ assertions = all id [
   isValidFisherNodeAtHeight 4 Nothing,
   isValidFisherNodeAtHeight 4 $ Just $ FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")],
   toList (FisherZero "bar") == [("", "bar")],
-  toList (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == [("food", "food"), ("fool", "fool"), ("foot", "foot")]
+  toList (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == [("food", "food"), ("fool", "fool"), ("foot", "foot")],
+  fisherFindNonEmpty "food" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == Just "food",
+  fisherFindNonEmpty "foop" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == Nothing,
+  fisherFind "food" Nothing == (Nothing :: Maybe String),
+  fisherFind "food" (Just $ (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")])) == Just "food"
   ]
