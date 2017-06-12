@@ -4,6 +4,10 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Data.List (stripPrefix)
 
+splitPrefix :: Eq a => [a] -> [a] -> ([a], [a], [a])
+splitPrefix (x:xs) (y:ys) | x == y    = (x:p, xs', ys') where (p, xs', ys') = splitPrefix xs ys
+splitPrefix    xs     ys              = ([], xs, ys)
+
 type Height = Int  -- not required at runtime but useful for assertions
 
 -- Represents a non-empty map!
@@ -11,6 +15,7 @@ type Height = Int  -- not required at runtime but useful for assertions
 data FisherNode v
   = FisherZero v  -- maps empty string to v
   | FisherSucc Height [Char] (Either v (Map Char (FisherNode v)))
+  deriving (Eq)
 
 -- Association lists are the simplest data structure to express a map.
 -- Haskell libraries use association lists as an exchange format.
@@ -57,8 +62,24 @@ fisherSingleton :: String -> v -> FisherNode v
 fisherSingleton "" v = FisherZero v
 fisherSingleton s v = FisherSucc (length s) s (Left v)
 
+fisherInsertNonEmpty :: String -> v -> FisherNode v -> FisherNode v
+fisherInsertNonEmpty "" v (FisherZero _) = FisherZero v
+fisherInsertNonEmpty s  v (FisherSucc h prefix next) =
+  case splitPrefix prefix s of
+    (_      , [],        sRem  ) -> case next of
+                                      Left _  -> FisherSucc h s (Left v)
+                                      Right m -> FisherSucc h prefix (Right $ M.alter fn (head sRem) m) where
+                                                  fn Nothing   = Just $ fisherSingleton (tail sRem) v
+                                                  fn (Just ft) = Just $ fisherInsertNonEmpty (tail sRem) v ft
+    (prefix', pc:prefCs, sc:sCs) -> FisherSucc h prefix' (Right $ M.fromList [
+                                      (pc, FisherSucc (h - length prefix' - 1) prefCs next),
+                                      (sc, FisherSucc (h - length prefix' - 1) sCs    (Left v))
+                                    ])
+
 assertions :: Bool
 assertions = all id [
+  splitPrefix "foo" "food" == ("foo", "", "d"),
+  splitPrefix "foo" "bar" == ("", "foo", "bar"),
   isValidNonEmptyFisherNodeAtHeight 0 (FisherZero "bar"),
   isValidNonEmptyFisherNodeAtHeight 4 $ FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")],
   isValidFisherNodeAtHeight 4 Nothing,
@@ -68,5 +89,6 @@ assertions = all id [
   fisherFindNonEmpty "food" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == Just "food",
   fisherFindNonEmpty "foop" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == Nothing,
   fisherFind "food" Nothing == (Nothing :: Maybe String),
-  fisherFind "food" (Just $ (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")])) == Just "food"
+  fisherFind "food" (Just $ FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == Just "food",
+  fisherInsertNonEmpty "fool" "fool" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('t', FisherZero "foot")]) == (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")])
   ]
