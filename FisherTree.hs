@@ -14,7 +14,7 @@ type Height = Int  -- not required at runtime but useful for assertions
 data FisherNotEmpty v
   = FisherZero v  -- maps empty string to v
   | FisherSucc Height [Char] (Either v (Map Char (FisherNotEmpty v)))
-  deriving (Eq)
+  deriving (Eq, Show)
 
 type Fisher v = Maybe (FisherNotEmpty v)
 
@@ -120,7 +120,8 @@ assertions = all id [
   fisherFind "food" Nothing == (Nothing :: Maybe String),
   fisherFind "food" (Just $ FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == Just "food",
   fisherNotEmptyInsert "fool" "fool" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('t', FisherZero "foot")]) == (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]),
-  fisherInsert "food" 5 Nothing == (Just $ FisherSucc 4 "food" (Left 5))
+  fisherInsert "food" 5 Nothing == (Just $ FisherSucc 4 "food" (Left 5)),
+  fisherNotEmptyDelete "bar" (FisherSucc 3 "" (Right (M.fromList [('b',FisherSucc 2 "ar" (Left 11)),('f',FisherSucc 2 "oo" (Left 5))]))) == Just (FisherSucc 3 "foo" (Left 5))
   ]
 
 data Op
@@ -135,29 +136,18 @@ fisherRunOp :: Op -> Fisher Int -> Fisher Int
 fisherRunOp (OpInsert k v) f = fisherInsert k v f
 fisherRunOp (OpDelete k) f = fisherDelete k f
 
-fisherRunOps :: [Op] -> Fisher Int -> Fisher Int
-fisherRunOps [] f = f
-fisherRunOps (o:os) f = fisherRunOps os (fisherRunOp o f)
-
 mapRunOp :: Op -> Map String Int -> Map String Int
 mapRunOp (OpInsert k v) = M.insert k v
 mapRunOp (OpDelete k) = M.delete k
 
-mapRunOps :: [Op] -> Map String Int -> Map String Int
-mapRunOps [] m = m
-mapRunOps (o:os) f = mapRunOps os (mapRunOp o f)
-
 runTest :: IO Bool
 runTest = do
   ops <- randOps
-  let tree = fisherRunOps ops Nothing
-  let m = mapRunOps ops M.empty
+  let tree = foldl (flip fisherRunOp) Nothing ops
+  let m    = foldl (flip mapRunOp) M.empty ops
   let l1 = fisherToList tree
   let l2 = M.toList m
-  if l1 == l2
-    then do
-      return True
-    else do
-      print l1
-      print l2
-      return False
+  print tree
+  print l1
+  print l2
+  return $ l1 == l2
