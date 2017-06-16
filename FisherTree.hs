@@ -16,6 +16,8 @@ data FisherNotEmpty v
   | FisherSucc Height [Char] (Either v (Map Char (FisherNotEmpty v)))
   deriving (Eq)
 
+type Fisher v = Maybe (FisherNotEmpty v)
+
 -- Association lists are the simplest data structure to express a map.
 -- Haskell libraries use association lists as an exchange format.
 fisherNotEmptyToList :: FisherNotEmpty v -> [(String, v)]
@@ -39,7 +41,7 @@ fisherNotEmptyIsValidAtHeight h (FisherSucc h' prefix (Right m)) =
     num_branches = M.size m
 fisherNotEmptyIsValidAtHeight h f = False
 
-fisherIsValidAtHeight :: Height -> Maybe (FisherNotEmpty v) -> Bool
+fisherIsValidAtHeight :: Height -> Fisher v -> Bool
 fisherIsValidAtHeight h Nothing = True
 fisherIsValidAtHeight h (Just f) = fisherNotEmptyIsValidAtHeight h f
 
@@ -53,7 +55,7 @@ fisherNotEmptyFind s  (FisherSucc h prefix (Right m)) =
                         Nothing -> Nothing
                         Just f  -> fisherNotEmptyFind rest f
 
-fisherFind :: String -> Maybe (FisherNotEmpty v) ->  Maybe v
+fisherFind :: String -> Fisher v -> Maybe v
 fisherFind _ Nothing  = Nothing
 fisherFind s (Just f) = fisherNotEmptyFind s f
 
@@ -75,6 +77,29 @@ fisherNotEmptyInsert s  v (FisherSucc h prefix next) =
                                       (sc, FisherSucc (h - length prefix' - 1) sCs    (Left v))
                                     ])
 
+fisherInsert :: String -> v -> Fisher v -> Fisher v
+fisherInsert s v Nothing  = Just $ fisherSingleton s v
+fisherInsert s v (Just f) = Just $ fisherNotEmptyInsert s v f
+
+fisherNotEmptyDelete :: String -> FisherNotEmpty v -> Fisher v
+fisherNotEmptyDelete "" (FisherZero _) = Nothing
+fisherNotEmptyDelete s t@(FisherSucc h s' (Left v)) =
+  if s == s' then Nothing else Just t
+fisherNotEmptyDelete s t@(FisherSucc h prefix (Right m)) = case splitPrefix prefix s of
+  (_, [], (c:cs)) -> case M.toList newM of
+                      [(c', f')] -> case f' of
+                                      FisherZero v -> Just $ FisherSucc h (prefix ++ [c']) (Left v)
+                                      FisherSucc h' prefix' next -> Just $ FisherSucc h (prefix ++ [c'] ++ prefix) next
+                      _          -> Just $ FisherSucc h prefix (Right newM)
+                     where
+                      newM = M.alter fn c m
+                      fn Nothing = Nothing
+                      fn (Just f) = fisherNotEmptyDelete cs f
+  _ -> Just t
+
+fisherDelete :: String -> Fisher v -> Fisher v
+fisherDelete s Nothing  = Nothing
+fisherDelete s (Just f) = fisherNotEmptyDelete s f
 
 assertions :: Bool
 assertions = all id [
@@ -90,5 +115,6 @@ assertions = all id [
   fisherNotEmptyFind "foop" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == Nothing,
   fisherFind "food" Nothing == (Nothing :: Maybe String),
   fisherFind "food" (Just $ FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]) == Just "food",
-  fisherNotEmptyInsert "fool" "fool" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('t', FisherZero "foot")]) == (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")])
+  fisherNotEmptyInsert "fool" "fool" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('t', FisherZero "foot")]) == (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]),
+  fisherInsert "food" 5 Nothing == (Just $ FisherSucc 4 "food" (Left 5))
   ]
