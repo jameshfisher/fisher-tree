@@ -26,6 +26,10 @@ fisherNotEmptyToList (FisherSucc _ prefix (Left v)) = [(prefix, v)]
 fisherNotEmptyToList (FisherSucc _ prefix (Right m)) =
   concatMap (\(c, f) -> map (\(s, v) -> (prefix ++ c:s, v)) (fisherNotEmptyToList f)) $ M.toList m
 
+fisherToList :: Fisher v -> [(String, v)]
+fisherToList Nothing = []
+fisherToList (Just f) = fisherNotEmptyToList f
+
 fisherNotEmptyIsValidAtHeight :: Height -> FisherNotEmpty v -> Bool
 fisherNotEmptyIsValidAtHeight 0 (FisherZero _) = True
 fisherNotEmptyIsValidAtHeight h (FisherSucc h' prefix (Left _)) =
@@ -118,3 +122,42 @@ assertions = all id [
   fisherNotEmptyInsert "fool" "fool" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('t', FisherZero "foot")]) == (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherZero "food"), ('l', FisherZero "fool"), ('t', FisherZero "foot")]),
   fisherInsert "food" 5 Nothing == (Just $ FisherSucc 4 "food" (Left 5))
   ]
+
+data Op
+  = OpInsert String Int
+  | OpDelete String
+
+-- TODO
+randOps :: IO [Op]
+randOps = return [OpInsert "foo" 5, OpInsert "bar" 10, OpInsert "bar" 11, OpDelete "foo"]
+
+fisherRunOp :: Op -> Fisher Int -> Fisher Int
+fisherRunOp (OpInsert k v) f = fisherInsert k v f
+fisherRunOp (OpDelete k) f = fisherDelete k f
+
+fisherRunOps :: [Op] -> Fisher Int -> Fisher Int
+fisherRunOps [] f = f
+fisherRunOps (o:os) f = fisherRunOps os (fisherRunOp o f)
+
+mapRunOp :: Op -> Map String Int -> Map String Int
+mapRunOp (OpInsert k v) = M.insert k v
+mapRunOp (OpDelete k) = M.delete k
+
+mapRunOps :: [Op] -> Map String Int -> Map String Int
+mapRunOps [] m = m
+mapRunOps (o:os) f = mapRunOps os (mapRunOp o f)
+
+runTest :: IO Bool
+runTest = do
+  ops <- randOps
+  let tree = fisherRunOps ops Nothing
+  let m = mapRunOps ops M.empty
+  let l1 = fisherToList tree
+  let l2 = M.toList m
+  if l1 == l2
+    then do
+      return True
+    else do
+      print l1
+      print l2
+      return False
