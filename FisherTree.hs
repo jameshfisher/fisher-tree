@@ -93,7 +93,7 @@ fisherNotEmptyDelete s t@(FisherSucc h prefix (Right m)) = case splitPrefix pref
   (_, [], (c:cs)) -> case M.toList newM of
                       [(c', f')] -> case f' of
                                       FisherZero v -> Just $ FisherSucc h (prefix ++ [c']) (Left v)
-                                      FisherSucc h' prefix' next -> Just $ FisherSucc h (prefix ++ [c'] ++ prefix) next
+                                      FisherSucc h' prefix' next -> Just $ FisherSucc h (prefix ++ [c'] ++ prefix') next
                       _          -> Just $ FisherSucc h prefix (Right newM)
                      where
                       newM = M.alter fn c m
