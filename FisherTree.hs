@@ -4,6 +4,8 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Data.List (stripPrefix)
 import System.Process
+import Data.Char (chr, ord)
+import Control.Monad (replicateM)
 
 splitPrefix :: Eq a => [a] -> [a] -> ([a], [a], [a])
 splitPrefix (x:xs) (y:ys) | x == y    = (x:p, xs', ys') where (p, xs', ys') = splitPrefix xs ys
@@ -118,36 +120,51 @@ assertions = all id [
   ]
 
 data Op
-  = OpInsert String Int
+  = OpInsert String String
   | OpDelete String
+  deriving (Show)
 
--- TODO
-randOps :: IO [Op]
-randOps = return [OpInsert "foo" 5, OpInsert "bar" 10, OpInsert "bar" 11, OpDelete "foo"]
+fisherRunOp :: Op -> Fisher String -> Fisher String
+fisherRunOp (OpInsert k v) = fisherInsert k v
+fisherRunOp (OpDelete k) = fisherDelete k
 
-fisherRunOp :: Op -> Fisher Int -> Fisher Int
-fisherRunOp (OpInsert k v) f = fisherInsert k v f
-fisherRunOp (OpDelete k) f = fisherDelete k f
-
-mapRunOp :: Op -> Map String Int -> Map String Int
+mapRunOp :: Op -> Map String String -> Map String String
 mapRunOp (OpInsert k v) = M.insert k v
 mapRunOp (OpDelete k) = M.delete k
 
 -- stupidly, System.Random is not part of the standard library.
 -- so we have to create our own random. Returns in [0,1).
+-- it is EXTREMELY slow!
 randomFloat :: IO Float
 randomFloat = do
   str <- System.Process.readProcess "node" ["-e", "console.log(Math.random())"] ""
   return $ read str
 
+randomChar :: IO Char
+randomChar = do
+  f <- randomFloat
+  return $ chr $ ord 'a' + floor (f*5.0)
+
+randomString :: IO String
+randomString = replicateM 3 randomChar
+
+randomOp :: IO Op
+randomOp = do
+  f <- randomFloat
+  k <- randomString
+  if f < 0.5
+    then return $ OpInsert k k
+    else return $ OpDelete k
+
+-- TODO
+randomOps :: IO [Op]
+randomOps = replicateM 10 randomOp
+
 runTest :: IO Bool
 runTest = do
-  ops <- randOps
+  ops <- randomOps
   let tree = foldl (flip fisherRunOp) Nothing ops
   let m    = foldl (flip mapRunOp) M.empty ops
   let l1 = fisherToList tree
   let l2 = M.toList m
-  print tree
-  print l1
-  print l2
   return $ l1 == l2
