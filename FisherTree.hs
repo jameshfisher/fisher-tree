@@ -43,17 +43,18 @@ fisherNotEmptyIsValidAtHeight h (FisherSucc h' prefix (Right m)) =
     num_branches = M.size m
 
 fisherIsValidAtHeight :: Height -> Fisher v -> Bool
-fisherIsValidAtHeight h Nothing = True
+fisherIsValidAtHeight _ Nothing = True
 fisherIsValidAtHeight h (Just f) = fisherNotEmptyIsValidAtHeight h f
 
 fisherNotEmptyFind :: String -> FisherNotEmpty v -> Maybe v
-fisherNotEmptyFind s  (FisherSucc h s'     (Left v)) = if s == s' then Just v else Nothing
-fisherNotEmptyFind s  (FisherSucc h prefix (Right m)) =
+fisherNotEmptyFind s (FisherSucc _ prefix next) =
   case stripPrefix prefix s of
     Nothing -> Nothing
-    Just (c:rest) ->  case M.lookup c m of
-                        Nothing -> Nothing
-                        Just f  -> fisherNotEmptyFind rest f
+    Just rest -> case next of
+                  Left v -> Just v  -- here we know rest == ""
+                  Right m -> case M.lookup (head rest) m of
+                              Nothing -> Nothing
+                              Just f  -> fisherNotEmptyFind (tail rest) f
 
 fisherFind :: String -> Fisher v -> Maybe v
 fisherFind _ Nothing  = Nothing
@@ -74,26 +75,27 @@ fisherNotEmptyInsert s  v (FisherSucc h prefix next) =
                                       (pc, FisherSucc (h - length prefix' - 1) prefCs next),
                                       (sc, FisherSucc (h - length prefix' - 1) sCs    (Left v))
                                     ])
+    _ -> error "inserted string must be different length to height of tree"
 
 fisherInsert :: String -> v -> Fisher v -> Fisher v
 fisherInsert s v Nothing  = Just $ fisherSingleton s v
 fisherInsert s v (Just f) = Just $ fisherNotEmptyInsert s v f
 
 fisherNotEmptyDelete :: String -> FisherNotEmpty v -> Fisher v
-fisherNotEmptyDelete s t@(FisherSucc h s' (Left v)) =
+fisherNotEmptyDelete s t@(FisherSucc _ s' (Left _)) =
   if s == s' then Nothing else Just t
 fisherNotEmptyDelete s t@(FisherSucc h prefix (Right m)) = case splitPrefix prefix s of
   (_, [], (c:cs)) -> case M.toList newM of
-                      [(c', FisherSucc h' prefix' next)] -> Just $ FisherSucc h (prefix ++ [c'] ++ prefix') next
+                      [(c', FisherSucc _ prefix' next)] -> Just $ FisherSucc h (prefix ++ [c'] ++ prefix') next
                       _                                  -> Just $ FisherSucc h prefix (Right newM)
                      where
-                      newM = M.alter fn c m
-                      fn Nothing = Nothing
-                      fn (Just f) = fisherNotEmptyDelete cs f
+                      newM = M.alter fn c m where
+                        fn Nothing = Nothing
+                        fn (Just f) = fisherNotEmptyDelete cs f
   _ -> Just t
 
 fisherDelete :: String -> Fisher v -> Fisher v
-fisherDelete s Nothing  = Nothing
+fisherDelete _ Nothing  = Nothing
 fisherDelete s (Just f) = fisherNotEmptyDelete s f
 
 assertions :: Bool
@@ -111,8 +113,8 @@ assertions = all id [
   fisherFind "food" Nothing == (Nothing :: Maybe String),
   fisherFind "food" (Just $ FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherSucc 0 "" (Left "food")), ('l', FisherSucc 0 "" (Left "fool")), ('t', FisherSucc 0 "" (Left "foot"))]) == Just "food",
   fisherNotEmptyInsert "fool" "fool" (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherSucc 0 "" (Left "food")), ('t', FisherSucc 0 "" (Left "foot"))]) == (FisherSucc 4 "foo" $ Right $ M.fromList [('d', FisherSucc 0 "" (Left "food")), ('l', FisherSucc 0 "" (Left "fool")), ('t', FisherSucc 0 "" (Left "foot"))]),
-  fisherInsert "food" 5 Nothing == (Just $ FisherSucc 4 "food" (Left 5)),
-  fisherNotEmptyDelete "bar" (FisherSucc 3 "" (Right (M.fromList [('b',FisherSucc 2 "ar" (Left 11)),('f',FisherSucc 2 "oo" (Left 5))]))) == Just (FisherSucc 3 "foo" (Left 5))
+  fisherInsert "food" (5::Integer) Nothing == (Just $ FisherSucc 4 "food" (Left 5)),
+  fisherNotEmptyDelete "bar" (FisherSucc 3 "" (Right (M.fromList [('b',FisherSucc 2 "ar" (Left (11 :: Integer))),('f',FisherSucc 2 "oo" (Left 5))]))) == Just (FisherSucc 3 "foo" (Left 5))
   ]
 
 data Op
