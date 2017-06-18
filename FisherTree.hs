@@ -3,6 +3,7 @@ module FisherTrie where
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.List (stripPrefix)
+import System.Process
 
 splitPrefix :: Eq a => [a] -> [a] -> ([a], [a], [a])
 splitPrefix (x:xs) (y:ys) | x == y    = (x:p, xs', ys') where (p, xs', ys') = splitPrefix xs ys
@@ -139,6 +140,13 @@ fisherRunOp (OpDelete k) f = fisherDelete k f
 mapRunOp :: Op -> Map String Int -> Map String Int
 mapRunOp (OpInsert k v) = M.insert k v
 mapRunOp (OpDelete k) = M.delete k
+
+-- stupidly, System.Random is not part of the standard library.
+-- so we have to create our own random. Returns in [0,1).
+randomFloat :: IO Float
+randomFloat = do
+  str <- System.Process.readProcess "node" ["-e", "console.log(Math.random())"] ""
+  return $ read str
 
 runTest :: IO Bool
 runTest = do
