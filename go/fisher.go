@@ -23,6 +23,8 @@ func assert_eq_arr(a []byte, b []byte) {
   }
 }
 
+// Represents a non-empty map!
+// To represent an empty map, use a null pointer.
 type fisher_node struct {
   height int;  // Unnecessary, but useful for assertions
 
@@ -38,15 +40,15 @@ func assert_fisher_valid_nonempty(_tree interface{}, height int) {
   if 0 < height {
     var tree *fisher_node = _tree.(*fisher_node);
     assert_eq(tree.height, height);
-    assert(len(tree.prefix) <= height);
+    assert(len(tree.prefix) <= height);  // Prefix can be zero-length.
     var after_prefix_height int = height - len(tree.prefix);
     if after_prefix_height == 0 {
       assert_eq(len(tree.branches), 0);
     } else {
       assert(1 < len(tree.branches));
       assert(len(tree.branches) <= 256);
+      var after_prefix_and_branches_height int = after_prefix_height-1;
       for _, t := range tree.branches {
-        var after_prefix_and_branches_height int = after_prefix_height-1;
         assert_fisher_valid_nonempty(t, after_prefix_and_branches_height);
       }
     }
