@@ -4,6 +4,51 @@ import "testing"
 import "math/rand"
 import "fmt"
 
+func assert(b bool) {
+  if !b {
+    panic("Assertion failed");
+  }
+}
+
+func assert_eq(a interface{}, b interface{}) {
+  if a != b {
+    fmt.Printf("%#v != %#v\n", a, b);
+    panic("Not equal");
+  }
+}
+
+func assert_eq_arr(a []byte, b []byte) {
+  assert_eq(len(a), len(b));
+  for i := 0; i < len(a); i++ {
+    assert_eq(a[i], b[i]);
+  }
+}
+
+func assert_fisher_valid_nonempty(_tree interface{}, height int) {
+  if 0 < height {
+    var tree *fisher_node = _tree.(*fisher_node);
+    assert_eq(tree.height, height);
+    assert(len(tree.prefix) <= height);  // Prefix can be zero-length.
+    var after_prefix_height int = height - len(tree.prefix);
+    if after_prefix_height == 0 {
+      assert_eq(len(tree.branches), 0);
+    } else {
+      assert(1 < len(tree.branches));
+      assert(len(tree.branches) <= 256);
+      var after_prefix_and_branches_height int = after_prefix_height-1;
+      for _, t := range tree.branches {
+        assert_fisher_valid_nonempty(t, after_prefix_and_branches_height);
+      }
+    }
+  }
+}
+
+func assert_fisher_valid(tree interface{}, height int) {
+  if tree != nil {
+    assert_fisher_valid_nonempty(tree, height);
+  }
+}
+
 func TestConst(*testing.T) {
   t := fisher_empty();
   assert_eq(fisher_find(t, []byte{1,2,3}), nil);

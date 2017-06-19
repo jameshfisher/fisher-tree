@@ -1,27 +1,5 @@
 package main
 
-import "fmt"
-
-func assert(b bool) {
-  if !b {
-    panic("Assertion failed");
-  }
-}
-
-func assert_eq(a interface{}, b interface{}) {
-  if a != b {
-    fmt.Printf("%#v != %#v\n", a, b);
-    panic("Not equal");
-  }
-}
-
-func assert_eq_arr(a []byte, b []byte) {
-  assert_eq(len(a), len(b));
-  for i := 0; i < len(a); i++ {
-    assert_eq(a[i], b[i]);
-  }
-}
-
 // Represents a non-empty map!
 // To represent an empty map, use a null pointer.
 type fisher_node struct {
@@ -35,34 +13,9 @@ type fisher_node struct {
   branches map[byte]interface{};  // In C we will use two concatted arrays and binary search; not a hash table.
 }
 
-func assert_fisher_valid_nonempty(_tree interface{}, height int) {
-  if 0 < height {
-    var tree *fisher_node = _tree.(*fisher_node);
-    assert_eq(tree.height, height);
-    assert(len(tree.prefix) <= height);  // Prefix can be zero-length.
-    var after_prefix_height int = height - len(tree.prefix);
-    if after_prefix_height == 0 {
-      assert_eq(len(tree.branches), 0);
-    } else {
-      assert(1 < len(tree.branches));
-      assert(len(tree.branches) <= 256);
-      var after_prefix_and_branches_height int = after_prefix_height-1;
-      for _, t := range tree.branches {
-        assert_fisher_valid_nonempty(t, after_prefix_and_branches_height);
-      }
-    }
-  }
-}
-
-func assert_fisher_valid(tree interface{}, height int) {
-  if tree != nil {
-    assert_fisher_valid_nonempty(tree, height);
-  }
-}
-
 func fisher_find(_tree interface{}, key []byte) interface{} {
   // fmt.Printf("fisher_find(%#v, %#v)\n", _tree, key);
-  assert_fisher_valid(_tree, len(key));
+  // assert_fisher_valid(_tree, len(key));
   if len(key) == 0 {
     return _tree;
   }
@@ -70,7 +23,7 @@ func fisher_find(_tree interface{}, key []byte) interface{} {
     return nil;
   }
   var tree *fisher_node = _tree.(*fisher_node);
-  assert_eq(tree.height, len(key));
+  // assert_eq(tree.height, len(key));
   var prefix []byte = tree.prefix;
   var i int = 0;
   for i < len(prefix) {
@@ -107,7 +60,7 @@ func fisher_empty() interface{} {
 }
 
 func fisher_insert(_tree interface{}, key []byte, val interface{}) interface{} {
-  assert_fisher_valid(_tree, len(key));
+  // assert_fisher_valid(_tree, len(key));
   if len(key) == 0 {
     return val;
   }
@@ -165,7 +118,7 @@ func fisher_insert(_tree interface{}, key []byte, val interface{}) interface{} {
 }
 
 func fisher_delete(_tree interface{}, key []byte) interface{} {
-  assert_fisher_valid(_tree, len(key));
+  // assert_fisher_valid(_tree, len(key));
   if len(key) == 0 {
     return nil;
   }
@@ -173,7 +126,7 @@ func fisher_delete(_tree interface{}, key []byte) interface{} {
     return nil;
   }
   var tree *fisher_node = _tree.(*fisher_node);
-  assert_eq(tree.height, len(key));
+  // assert_eq(tree.height, len(key));
   var prefix []byte = tree.prefix;
   var i int = 0;
   for i < len(prefix) {
@@ -196,12 +149,12 @@ func fisher_delete(_tree interface{}, key []byte) interface{} {
 
   if remaining == 0 {
     // tree is a leaf.
-    assert(1 < len(tree.branches));
+    // assert(1 < len(tree.branches));
     delete(tree.branches, key[len(prefix)]);  // delete any associated value.
     if 1 < len(tree.branches) {
       return tree;
     }
-    assert_eq(1, len(tree.branches));
+    // assert_eq(1, len(tree.branches));
     // merge the prefix and the single branch byte.
     var b byte;
     var v interface{};
@@ -221,12 +174,12 @@ func fisher_delete(_tree interface{}, key []byte) interface{} {
   }
 
   // We got a nil subtree back; delete it from the branches.
-  assert(1 < len(tree.branches));
+  // assert(1 < len(tree.branches));
   delete(tree.branches, key[len(prefix)]);
   if 1 < len(tree.branches) {
     return tree;
   }
-  assert_eq(1, len(tree.branches));
+  // assert_eq(1, len(tree.branches));
   // merge the prefix, the single branch byte, and the following node.
   var b byte;
   var sub interface{};
@@ -258,7 +211,7 @@ func fisher_v_empty() interface{} {
 
 func fisher_v_find(len_map interface{}, key []byte) interface{} {
   var t interface{} = fisher_find(len_map, int_bytes(len(key)));
-  assert_fisher_valid(t, len(key));
+  // assert_fisher_valid(t, len(key));
   return fisher_find(t, key);
 }
 
@@ -268,7 +221,7 @@ func fisher_v_insert(len_map interface{}, key []byte, val interface{}) interface
 
 func fisher_v_delete(len_map interface{}, key []byte) interface{} {
   var t interface{} = fisher_find(len_map, int_bytes(len(key)));
-  assert_fisher_valid(t, len(key));
+  // assert_fisher_valid(t, len(key));
   var new_t interface{} = fisher_delete(t, key);
   if new_t == nil {
     return fisher_delete(len_map, int_bytes(len(key)));
